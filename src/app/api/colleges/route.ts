@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     const allCollegesForLocations = await prisma.college.findMany({
       select: { location: true },
     });
-    
+
     // Extraced unique cities/states
     const locations = Array.from(
       new Set(allCollegesForLocations.map((c) => c.location.split(",")[0].trim()))
