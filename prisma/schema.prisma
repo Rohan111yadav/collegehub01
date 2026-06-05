@@ -10,33 +10,36 @@ datasource db {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  name      String?
-  password  String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  favorites Favorite[]
+  id             String           @id @default(uuid())
+  email          String           @unique
+  name           String?
+  password       String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  favorites      Favorite[]
+  comparisons    Comparison[]
+  recentlyViewed RecentlyViewed[]
 }
 
 model College {
-  id              String     @id @default(uuid())
+  id              String           @id @default(uuid())
   name            String
   location        String
-  fees            Int        // annual fee in INR
-  rating          Float      // rating e.g. 4.5
-  placements      Float      // average placements in LPA (e.g. 12.5)
+  fees            Int              // annual fee in INR
+  rating          Float            // rating e.g. 4.5
+  placements      Float            // average placements in LPA (e.g. 12.5)
   image           String
-  description     String     @db.Text
-  courses         Json       // array of strings e.g. ["B.Tech Computer Science", "B.Tech IT"]
-  reviews         Json       // array of objects e.g. [{"author": "John", "rating": 4.5, "comment": "Good college"}]
+  description     String           @db.Text
+  courses         Json             // array of strings e.g. ["B.Tech Computer Science", "B.Tech IT"]
+  reviews         Json             // array of objects e.g. [{"author": "John", "rating": 4.5, "comment": "Good college"}]
   establishedYear Int
-  type            String     // Public or Private
-  accreditation   String     // NAAC A++, etc.
+  type            String           // Public or Private
+  accreditation   String           // NAAC A++, etc.
   website         String
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   favoritedBy     Favorite[]
+  recentlyViewed  RecentlyViewed[]
 }
 
 model Favorite {
@@ -50,3 +53,25 @@ model Favorite {
 
   @@unique([userId, collegeId])
 }
+
+model Comparison {
+  id         String   @id @default(uuid())
+  userId     String
+  collegeIds String[]
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RecentlyViewed {
+  id        String   @id @default(uuid())
+  userId    String
+  collegeId String
+  viewedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  college College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collegeId])
+}
+

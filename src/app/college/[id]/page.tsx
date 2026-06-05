@@ -61,6 +61,19 @@ export default function CollegeDetailPage({
     checkFavoriteStatus();
   }, [fetchCollege, checkFavoriteStatus]);
 
+  // Track recently viewed college
+  useEffect(() => {
+    if (session && college) {
+      fetch("/api/recently-viewed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collegeId: college.id }),
+      }).catch((err) => {
+        console.error("Failed to track recently viewed college:", err);
+      });
+    }
+  }, [session, college]);
+
   if (isLoading) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center bg-slate-950 py-24 text-slate-400">
