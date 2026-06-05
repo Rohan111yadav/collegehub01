@@ -4,13 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:setup": "tsx scripts/db-setup.ts",
+    "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
@@ -29,12 +29,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
-    "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   }
 }

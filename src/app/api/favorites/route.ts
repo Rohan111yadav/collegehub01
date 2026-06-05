@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/db";
+import crypto from "crypto";
 
 export async function GET(req: Request) {
   try {
@@ -14,18 +15,15 @@ export async function GET(req: Request) {
       );
     }
 
-    const favorites = await prisma.favorite.findMany({
-      where: { userId: session.user.id },
-      include: {
-        college: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const res = await query(
+      `SELECT c.* FROM "Favorite" f
+       JOIN "College" c ON f."collegeId" = c.id
+       WHERE f."userId" = $1
+       ORDER BY f."createdAt" DESC`,
+      [session.user.id]
+    );
 
-    // Map to return just the college object
-    const colleges = favorites.map((f) => f.college);
+    const colleges = res.rows;
 
     return NextResponse.json({ colleges });
   } catch (error) {
@@ -58,11 +56,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const collegeExists = await prisma.college.findUnique({
-      where: { id: collegeId },
-    });
+    // Verify college exists
+    const collegeExistsRes = await query(
+      'SELECT id FROM "College" WHERE id = $1',
+      [collegeId]
+    );
 
-    if (!collegeExists) {
+    if (collegeExistsRes.rows.length === 0) {
       return NextResponse.json(
         { message: "College not found" },
         { status: 404 }
@@ -70,31 +70,26 @@ export async function POST(req: Request) {
     }
 
     // Check if already favorited
-    const existingFavorite = await prisma.favorite.findUnique({
-      where: {
-        userId_collegeId: {
-          userId: session.user.id,
-          collegeId,
-        },
-      },
-    });
+    const existingFavoriteRes = await query(
+      'SELECT * FROM "Favorite" WHERE "userId" = $1 AND "collegeId" = $2',
+      [session.user.id, collegeId]
+    );
+    const existingFavorite = existingFavoriteRes.rows[0];
 
     if (existingFavorite) {
       // Toggle off (delete favorite)
-      await prisma.favorite.delete({
-        where: {
-          id: existingFavorite.id,
-        },
-      });
+      await query(
+        'DELETE FROM "Favorite" WHERE id = $1',
+        [existingFavorite.id]
+      );
       return NextResponse.json({ favorited: false, message: "Removed from favorites" });
     } else {
       // Toggle on (create favorite)
-      await prisma.favorite.create({
-        data: {
-          userId: session.user.id,
-          collegeId,
-        },
-      });
+      const favoriteId = crypto.randomUUID();
+      await query(
+        'INSERT INTO "Favorite" (id, "userId", "collegeId") VALUES ($1, $2, $3)',
+        [favoriteId, session.user.id, collegeId]
+      );
       return NextResponse.json({ favorited: true, message: "Added to favorites" });
     }
   } catch (error) {

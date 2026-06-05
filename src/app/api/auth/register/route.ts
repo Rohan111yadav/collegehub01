@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import crypto from "crypto";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email format"),
@@ -23,9 +24,11 @@ export async function POST(req: Request) {
 
     const { email, password, name } = result.data;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUserResult = await query(
+      'SELECT * FROM "User" WHERE email = $1',
+      [email]
+    );
+    const existingUser = existingUserResult.rows[0];
 
     if (existingUser) {
       return NextResponse.json(
@@ -35,14 +38,13 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = crypto.randomUUID();
 
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-      },
-    });
+    const newUserResult = await query(
+      'INSERT INTO "User" (id, email, password, name) VALUES ($1, $2, $3, $4) RETURNING id, email, name',
+      [userId, email, hashedPassword, name || null]
+    );
+    const newUser = newUserResult.rows[0];
 
     return NextResponse.json(
       {

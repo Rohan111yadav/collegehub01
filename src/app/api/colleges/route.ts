@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import { query } from "@/lib/db";
 
 export async function GET(req: Request) {
   try {
@@ -22,63 +21,58 @@ export async function GET(req: Request) {
     const skip = (page - 1) * limit;
 
     // Building filters
-    const where: Prisma.CollegeWhereInput = {
-      fees: {
-        gte: minFees,
-        lte: maxFees,
-      },
-      rating: {
-        gte: minRating,
-      },
-    };
+    let whereClause = `WHERE fees >= $1 AND fees <= $2 AND rating >= $3`;
+    const params: any[] = [minFees, maxFees, minRating];
+    let paramIndex = 4;
 
     if (q) {
-      where.OR = [
-        { name: { contains: q, mode: "insensitive" } },
-        { location: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-      ];
+      whereClause += ` AND (name ILIKE $${paramIndex} OR location ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`;
+      params.push(`%${q}%`);
+      paramIndex++;
     }
 
     if (location) {
-      where.location = { contains: location, mode: "insensitive" };
+      whereClause += ` AND location ILIKE $${paramIndex}`;
+      params.push(`%${location}%`);
+      paramIndex++;
     }
 
     if (type && type !== "All") {
-      where.type = type;
+      whereClause += ` AND type = $${paramIndex}`;
+      params.push(type);
+      paramIndex++;
     }
 
-    // Sorting order
-    let orderBy: Prisma.CollegeOrderByWithRelationInput = { rating: "desc" }; // default sorting
-    if (sortBy === "fees") {
-      orderBy = { fees: sortOrder };
-    } else if (sortBy === "placements") {
-      orderBy = { placements: sortOrder };
-    } else if (sortBy === "rating") {
-      orderBy = { rating: sortOrder };
-    } else if (sortBy === "name") {
-      orderBy = { name: sortOrder };
-    }
+    // Whitelist sorting configurations
+    const whitelistedSortFields = ["rating", "fees", "placements", "name"];
+    const whitelistedSortOrders = ["asc", "desc"];
 
-    // Querying
-    const [colleges, total] = await prisma.$transaction([
-      prisma.college.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.college.count({ where }),
-    ]);
+    const activeSortField = whitelistedSortFields.includes(sortBy) ? sortBy : "rating";
+    const activeSortOrder = whitelistedSortOrders.includes(sortOrder.toLowerCase()) ? sortOrder.toUpperCase() : "DESC";
 
-    // Extracting list of unique locations for filters sidebar
-    const allCollegesForLocations = await prisma.college.findMany({
-      select: { location: true },
-    });
+    // Count total matches
+    const countQuery = `SELECT COUNT(*) FROM "College" ${whereClause}`;
+    const countRes = await query(countQuery, params);
+    const total = parseInt(countRes.rows[0].count, 10);
 
+    // Fetch matching data
+    const dataQuery = `
+      SELECT * FROM "College"
+      ${whereClause}
+      ORDER BY "${activeSortField}" ${activeSortOrder}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    const dataParams = [...params, limit, skip];
+    const dataRes = await query(dataQuery, dataParams);
+    const colleges = dataRes.rows;
+
+    // Fetch unique locations
+    const locationsQuery = `SELECT DISTINCT location FROM "College"`;
+    const locationsRes = await query(locationsQuery);
+    
     // Extraced unique cities/states
     const locations = Array.from(
-      new Set(allCollegesForLocations.map((c) => c.location.split(",")[0].trim()))
+      new Set(locationsRes.rows.map((c: any) => c.location.split(",")[0].trim()))
     ).sort();
 
     return NextResponse.json({

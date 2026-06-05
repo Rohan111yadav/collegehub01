@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/db";
 import { z } from "zod";
+import crypto from "crypto";
 
 const trackViewSchema = z.object({
   collegeId: z.string(),
@@ -18,16 +19,16 @@ export async function GET(req: Request) {
       );
     }
 
-    const views = await prisma.recentlyViewed.findMany({
-      where: { userId: session.user.id },
-      orderBy: { viewedAt: "desc" },
-      take: 6, // Retrieve top 6
-      include: {
-        college: true,
-      },
-    });
+    const viewsRes = await query(
+      `SELECT c.* FROM "RecentlyViewed" r
+       JOIN "College" c ON r."collegeId" = c.id
+       WHERE r."userId" = $1
+       ORDER BY r."viewedAt" DESC
+       LIMIT 6`,
+      [session.user.id]
+    );
 
-    const colleges = views.map((v) => v.college);
+    const colleges = viewsRes.rows;
 
     return NextResponse.json({ colleges });
   } catch (error) {
@@ -62,33 +63,29 @@ export async function POST(req: Request) {
     const { collegeId } = result.data;
 
     // Verify college exists
-    const college = await prisma.college.findUnique({
-      where: { id: collegeId },
-    });
+    const collegeRes = await query(
+      'SELECT id FROM "College" WHERE id = $1',
+      [collegeId]
+    );
 
-    if (!college) {
+    if (collegeRes.rows.length === 0) {
       return NextResponse.json(
         { message: "College not found" },
         { status: 404 }
       );
     }
 
-    // Upsert view
-    const view = await prisma.recentlyViewed.upsert({
-      where: {
-        userId_collegeId: {
-          userId: session.user.id,
-          collegeId,
-        },
-      },
-      update: {
-        viewedAt: new Date(),
-      },
-      create: {
-        userId: session.user.id,
-        collegeId,
-      },
-    });
+    // Upsert view natively
+    const recentId = crypto.randomUUID();
+    const viewRes = await query(
+      `INSERT INTO "RecentlyViewed" (id, "userId", "collegeId", "viewedAt")
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT ("userId", "collegeId")
+       DO UPDATE SET "viewedAt" = EXCLUDED."viewedAt"
+       RETURNING *`,
+      [recentId, session.user.id, collegeId]
+    );
+    const view = viewRes.rows[0];
 
     return NextResponse.json(
       { message: "View tracked successfully", view },

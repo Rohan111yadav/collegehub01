@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/db";
 
 export async function DELETE(
   req: Request,
@@ -26,9 +26,11 @@ export async function DELETE(
     }
 
     // Verify ownership of the comparison
-    const comparison = await prisma.comparison.findUnique({
-      where: { id },
-    });
+    const comparisonRes = await query(
+      'SELECT * FROM "Comparison" WHERE id = $1',
+      [id]
+    );
+    const comparison = comparisonRes.rows[0];
 
     if (!comparison) {
       return NextResponse.json(
@@ -45,9 +47,10 @@ export async function DELETE(
     }
 
     // Delete comparison
-    await prisma.comparison.delete({
-      where: { id },
-    });
+    await query(
+      'DELETE FROM "Comparison" WHERE id = $1',
+      [id]
+    );
 
     return NextResponse.json(
       { message: "Comparison deleted successfully" },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { query } from "@/lib/db";
 
 export async function GET(
   req: Request,
@@ -8,9 +8,11 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const college = await prisma.college.findUnique({
-      where: { id },
-    });
+    const res = await query(
+      'SELECT * FROM "College" WHERE id = $1',
+      [id]
+    );
+    const college = res.rows[0];
 
     if (!college) {
       return NextResponse.json(

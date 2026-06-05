@@ -1,10 +1,6 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import "dotenv/config";
+import { pool } from "../src/lib/db";
+import crypto from "crypto";
 
 const collegesData = [
   {
@@ -489,33 +485,63 @@ const collegesData = [
   }
 ];
 
-async function main() {
-  console.log("Start seeding...");
+async function seed() {
+  console.log("Seeding PostgreSQL database with 20 realistic colleges...");
 
-  // Clear existing records
-  await prisma.favorite.deleteMany({});
-  await prisma.recentlyViewed.deleteMany({});
-  await prisma.comparison.deleteMany({});
-  await prisma.college.deleteMany({});
-
-  console.log("Deleted existing database records.");
-
-  // Insert colleges
-  for (const college of collegesData) {
-    const created = await prisma.college.create({
-      data: college,
-    });
-    console.log(`Created college: ${created.name} (${created.id})`);
+  // 1. Clear existing rows
+  try {
+    await pool.query('DELETE FROM "Favorite"');
+    await pool.query('DELETE FROM "RecentlyViewed"');
+    await pool.query('DELETE FROM "Comparison"');
+    await pool.query('DELETE FROM "College"');
+    console.log("Cleared existing entries from Favorite, RecentlyViewed, Comparison, and College tables.");
+  } catch (err) {
+    console.error("Failed to clear tables:", err);
+    process.exit(1);
   }
 
-  console.log("Seeding completed successfully!");
+  // 2. Insert colleges
+  const insertQuery = `
+    INSERT INTO "College" (
+      id, name, location, fees, rating, placements, image, description,
+      courses, reviews, "establishedYear", type, accreditation, website
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  `;
+
+  for (const c of collegesData) {
+    const id = crypto.randomUUID();
+    try {
+      await pool.query(insertQuery, [
+        id,
+        c.name,
+        c.location,
+        c.fees,
+        c.rating,
+        c.placements,
+        c.image,
+        c.description,
+        JSON.stringify(c.courses),
+        JSON.stringify(c.reviews),
+        c.establishedYear,
+        c.type,
+        c.accreditation,
+        c.website
+      ]);
+      console.log(`Successfully seeded college: ${c.name}`);
+    } catch (err) {
+      console.error(`Failed to seed college ${c.name}:`, err);
+      process.exit(1);
+    }
+  }
+
+  console.log("Database seeded successfully!");
 }
 
-main()
-  .catch((e) => {
-    console.error("Error during seeding database: ", e);
+seed()
+  .catch((err) => {
+    console.error("Seeding execution failed:", err);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    pool.end();
   });
