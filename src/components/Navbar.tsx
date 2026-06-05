@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useCompare } from "@/context/CompareContext";
-import { GraduationCap, Bookmark, GitCompare, LogOut, Menu, X, User } from "lucide-react";
+import { GraduationCap, Bookmark, GitCompare, LogOut, Menu, X, User, History } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -18,7 +18,8 @@ export default function Navbar() {
   const navLinks = [
     { href: "/colleges", label: "Find Colleges", icon: GraduationCap },
     { href: "/compare", label: "Compare", icon: GitCompare, badge: compareList.length },
-    { href: "/favorites", label: "Saved", icon: Bookmark, authRequired: true },
+    { href: "/favorites", label: "Saved Colleges", icon: Bookmark, authRequired: true },
+    { href: "/saved-comparisons", label: "Saved Comparisons", icon: History, authRequired: true },
   ];
 
   return (

@@ -1,13 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Search, GraduationCap, GitCompare, Bookmark, Award, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import CollegeCard from "@/components/CollegeCard";
+import { College } from "@/types";
 
 export default function Home() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
+  const [recentlyViewed, setRecentlyViewed] = useState<College[]>([]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/recently-viewed")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.colleges) {
+          setRecentlyViewed(data.colleges);
+        }
+      })
+      .catch((err) => console.error("Error fetching recently viewed colleges:", err));
+  }, [session]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +54,7 @@ export default function Home() {
   ];
 
   const stats = [
-    { label: "Partner Colleges", value: "15+", icon: Award },
+    { label: "Partner Colleges", value: "20+", icon: Award },
     { label: "Verified Reviews", value: "100%", icon: ShieldCheck },
     { label: "Avg Placement Package", value: "14.2 LPA", icon: TrendingUp },
     { label: "Happy Students", value: "10k+", icon: Users },
@@ -123,6 +140,36 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Recently Viewed Colleges Section */}
+      {session && recentlyViewed.length > 0 && (
+        <section className="border-b border-slate-900 bg-slate-950/20 py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white tracking-tight sm:text-2xl">
+                  Recently Viewed Colleges
+                </h2>
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Quick access to the institutions you recently explored.
+                </p>
+              </div>
+              <Link
+                href="/colleges"
+                className="text-xs font-semibold text-indigo-400 hover:text-indigo-300"
+              >
+                Browse All
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recentlyViewed.map((college) => (
+                <CollegeCard key={college.id} college={college} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Features Section */}
       <section className="py-24 sm:py-32">

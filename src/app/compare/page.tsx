@@ -1,13 +1,47 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useCompare } from "@/context/CompareContext";
 import CompareTable from "@/components/CompareTable";
-import { GraduationCap, Trash2 } from "lucide-react";
+import { GraduationCap, Trash2, Bookmark, Check, Loader2 } from "lucide-react";
 
 export default function ComparePage() {
+  const { data: session } = useSession();
   const { compareList, clearCompare } = useCompare();
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveComparison = async () => {
+    if (!session) return;
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      const res = await fetch("/api/comparisons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collegeIds: compareList.map((c) => c.id),
+        }),
+      });
+
+      if (res.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        const data = await res.json();
+        alert(data.message || "Failed to save comparison.");
+      }
+    } catch (err) {
+      console.error("Failed to save comparison:", err);
+      alert("An error occurred while saving the comparison.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="flex-1 bg-slate-950 py-10">
@@ -22,13 +56,44 @@ export default function ComparePage() {
             </p>
           </div>
           {compareList.length > 0 && (
-            <button
-              onClick={clearCompare}
-              className="flex items-center space-x-1.5 rounded-xl border border-red-500/20 bg-red-950/20 px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-600 hover:text-white transition duration-200 w-fit"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Clear Comparison</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 w-fit">
+              {session && (
+                <button
+                  onClick={handleSaveComparison}
+                  disabled={isSaving}
+                  className={`flex items-center space-x-1.5 rounded-xl px-4 py-2.5 text-xs font-bold transition duration-200 border cursor-pointer ${
+                    saveSuccess
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
+                  }`}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Saved!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-3.5 w-3.5" />
+                      <span>Save Comparison</span>
+                    </>
+                  )}
+                </button>
+              )}
+              
+              <button
+                onClick={clearCompare}
+                className="flex items-center space-x-1.5 rounded-xl border border-red-500/20 bg-red-950/20 px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-600 hover:text-white transition duration-200 w-fit cursor-pointer"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Clear</span>
+              </button>
+            </div>
           )}
         </div>
 

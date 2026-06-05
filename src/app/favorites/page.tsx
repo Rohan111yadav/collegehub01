@@ -11,6 +11,7 @@ import { Bookmark, Lock, Loader2 } from "lucide-react";
 export default function FavoritesPage() {
   const { data: session, status } = useSession();
   const [colleges, setColleges] = useState<College[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<College[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchFavorites = useCallback(async () => {
@@ -29,13 +30,27 @@ export default function FavoritesPage() {
     }
   }, [session]);
 
+  const fetchRecentlyViewed = useCallback(async () => {
+    if (!session) return;
+    try {
+      const res = await fetch("/api/recently-viewed");
+      if (res.ok) {
+        const data = await res.json();
+        setRecentlyViewed(data.colleges);
+      }
+    } catch (err) {
+      console.error("Failed to fetch recently viewed:", err);
+    }
+  }, [session]);
+
   useEffect(() => {
     if (session) {
       fetchFavorites();
+      fetchRecentlyViewed();
     } else {
       setIsLoading(false);
     }
-  }, [session, fetchFavorites]);
+  }, [session, fetchFavorites, fetchRecentlyViewed]);
 
   // Handle local state update when user toggles favorite off
   const handleFavoriteChange = (id: string, isFav: boolean) => {
@@ -117,6 +132,26 @@ export default function FavoritesPage() {
             >
               Find Colleges
             </Link>
+          </div>
+        )}
+        {/* Recently Viewed Colleges Section */}
+        {recentlyViewed.length > 0 && (
+          <div className="mt-16 border-t border-slate-900 pt-12">
+            <div className="mb-8">
+              <h2 className="text-2xl font-extrabold text-white tracking-tight">Recently Viewed</h2>
+              <p className="mt-1.5 text-sm text-slate-400">
+                Quick-access to the institutions you recently explored.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recentlyViewed.map((college) => (
+                <CollegeCard
+                  key={`recent-${college.id}`}
+                  college={college}
+                />
+              ))}
+            </div>
           </div>
         )}
 
